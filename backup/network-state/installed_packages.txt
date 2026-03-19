@@ -1,0 +1,2 @@
+Installed chaincodes on peer:
+Package ID: iot_hash_1.0:5db6d29a3caaf4a450a233e4888ca76273eb4399502c3aca28aab88f45c750fc, Label: iot_hash_1.0

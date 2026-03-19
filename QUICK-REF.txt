@@ -1,0 +1,28 @@
+╔══════════════════════════════════════════════════════════════╗
+║           NANOSCRIPT IOT BLOCKCHAIN - QUICK REF              ║
+╚══════════════════════════════════════════════════════════════╝
+
+[LOAD ENVIRONMENT]
+source ~/NanoScript-IoT-Blockchain/env/org1/env.sh
+
+[BASIC COMMANDS]
+peer chaincode invoke -C mychannel -n iot_hash -c '{"function":"storeHash","Args":["ID","HASH"]}'
+peer chaincode query -C mychannel -n iot_hash -c '{"function":"queryHash","Args":["ID"]}'
+
+[BATCH]
+peer chaincode invoke -C mychannel -n iot_hash -c '{"function":"storeBatchHash","Args":["BATCH_ID","[\"ID1\",\"ID2\"]","[\"H1\",\"H2\"]"]}'
+
+[HISTORY]
+peer chaincode invoke -C mychannel -n iot_hash -c '{"function":"storeHashWithHistory","Args":["ID","HASH"]}'
+peer chaincode query -C mychannel -n iot_hash -c '{"function":"getHistory","Args":["ID"]}'
+peer chaincode query -C mychannel -n iot_hash -c '{"function":"verifyIntegrity","Args":["ID","HASH"]}'
+
+[ACCESS CONTROL]
+peer chaincode invoke -C mychannel -n iot_hash -c '{"function":"storeHashPrivate","Args":["ID","HASH","[\"Org1MSP\",\"Org2MSP\"]"]}'
+peer chaincode query -C mychannel -n iot_hash -c '{"function":"queryHashPrivate","Args":["ID"]}'
+
+[FULL TEST]
+~/NanoScript-IoT-Blockchain/scripts/testing/full-test-suite.sh
+
+[REDEPLOY]
+~/NanoScript-IoT-Blockchain/scripts/deployment/redeploy.sh

@@ -1,0 +1,9 @@
+NAMES                                                                                                      STATUS              PORTS
+dev-peer0.org1.example.com-iot_hash_1.0-5db6d29a3caaf4a450a233e4888ca76273eb4399502c3aca28aab88f45c750fc   Up 57 seconds       
+dev-peer0.org2.example.com-iot_hash_1.0-5db6d29a3caaf4a450a233e4888ca76273eb4399502c3aca28aab88f45c750fc   Up 57 seconds       
+orderer.example.com                                                                                        Up About a minute   0.0.0.0:7050->7050/tcp, [::]:7050->7050/tcp, 0.0.0.0:7053->7053/tcp, [::]:7053->7053/tcp, 0.0.0.0:9443->9443/tcp, [::]:9443->9443/tcp
+peer0.org2.example.com                                                                                     Up About a minute   0.0.0.0:9051->9051/tcp, [::]:9051->9051/tcp, 0.0.0.0:9445->9445/tcp, [::]:9445->9445/tcp
+peer0.org1.example.com                                                                                     Up About a minute   0.0.0.0:7051->7051/tcp, [::]:7051->7051/tcp, 0.0.0.0:9444->9444/tcp, [::]:9444->9444/tcp
+ca_org2                                                                                                    Up About a minute   0.0.0.0:8054->8054/tcp, [::]:8054->8054/tcp, 0.0.0.0:18054->18054/tcp, [::]:18054->18054/tcp
+ca_orderer                                                                                                 Up About a minute   0.0.0.0:9054->9054/tcp, [::]:9054->9054/tcp, 0.0.0.0:19054->19054/tcp, [::]:19054->19054/tcp
+ca_org1                                                                                                    Up About a minute   0.0.0.0:7054->7054/tcp, [::]:7054->7054/tcp, 0.0.0.0:17054->17054/tcp, [::]:17054->17054/tcp
