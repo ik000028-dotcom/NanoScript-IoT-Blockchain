@@ -1,0 +1,91 @@
+//
+// !!! WARNING !!! AUTO-GENERATED FILE!
+// PLEASE DO NOT MODIFY IT AND USE "platformio.ini":
+// https://docs.platformio.org/page/projectconf/section_env_build.html#build-flags
+//
+{
+    "configurations": [
+        {
+            "name": "PlatformIO",
+            "includePath": [
+                "/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/include",
+                "/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/src",
+                "/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/.pio/libdeps/mkrzero/DHT sensor library",
+                "/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/.pio/libdeps/mkrzero/Adafruit Unified Sensor",
+                "/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/.pio/libdeps/mkrzero/Arduino_MKRGPS/src",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/Wire",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/cores/arduino/api/deprecated",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/cores/arduino/api/deprecated-avr-comp",
+                "/Users/ikramsmac/.platformio/packages/framework-cmsis/CMSIS/Include",
+                "/Users/ikramsmac/.platformio/packages/framework-cmsis-atmel/CMSIS/Device/ATMEL",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/cores/arduino",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/variants/mkrzero",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/HID",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/I2S/src",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SAMD_AnalogCorrection/src",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SAMD_BootloaderUpdater/src",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SBU/src",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SDU/src",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SFU/src",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SNU/src",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SPI",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SSU/src",
+                "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/USBHost/src",
+                ""
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/include",
+                    "/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/src",
+                    "/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/.pio/libdeps/mkrzero/DHT sensor library",
+                    "/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/.pio/libdeps/mkrzero/Adafruit Unified Sensor",
+                    "/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/.pio/libdeps/mkrzero/Arduino_MKRGPS/src",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/Wire",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/cores/arduino/api/deprecated",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/cores/arduino/api/deprecated-avr-comp",
+                    "/Users/ikramsmac/.platformio/packages/framework-cmsis/CMSIS/Include",
+                    "/Users/ikramsmac/.platformio/packages/framework-cmsis-atmel/CMSIS/Device/ATMEL",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/cores/arduino",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/variants/mkrzero",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/HID",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/I2S/src",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SAMD_AnalogCorrection/src",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SAMD_BootloaderUpdater/src",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SBU/src",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SDU/src",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SFU/src",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SNU/src",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SPI",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/SSU/src",
+                    "/Users/ikramsmac/.platformio/packages/framework-arduino-samd/libraries/USBHost/src",
+                    ""
+                ]
+            },
+            "defines": [
+                "PLATFORMIO=60119",
+                "ARDUINO_SAMD_MKRZERO",
+                "__SAMD21G18A__",
+                "USE_ARDUINO_MKR_PIN_LAYOUT",
+                "ARDUINO=10805",
+                "F_CPU=48000000L",
+                "USBCON",
+                "USB_VID=0x2341",
+                "USB_PID=0x804F",
+                "USB_PRODUCT=\"Arduino MKRZERO\"",
+                "USB_MANUFACTURER=\"Arduino\"",
+                "ARDUINO_ARCH_SAMD",
+                ""
+            ],
+            "cStandard": "gnu11",
+            "cppStandard": "gnu++11",
+            "compilerPath": "/Users/ikramsmac/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc",
+            "compilerArgs": [
+                "-mcpu=cortex-m0plus",
+                "-mthumb",
+                ""
+            ]
+        }
+    ],
+    "version": 4
+}
