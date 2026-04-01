@@ -1,7 +1,9 @@
 venv/
-chroma_db/
 __pycache__/
 *.pyc
 .env
 *.log
+.pio/build/
+.DS_Store
 config_block.pb
+*.tar.gz
