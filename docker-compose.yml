@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg14
+    environment:
+      POSTGRES_USER: ikramsmac
+      POSTGRES_DB: iot_data
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile.fastapi
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    environment:
+      - DATABASE_HOST=postgres
+      - DATABASE_NAME=iot_data
+      - DATABASE_USER=ikramsmac
+
+  simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.simulator
+    depends_on:
+      - fastapi
+    environment:
+      - API_URL=http://fastapi:8000/data
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
