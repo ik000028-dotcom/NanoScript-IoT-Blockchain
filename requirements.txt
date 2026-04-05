@@ -1,4 +1,31 @@
+# FastAPI Backend (L3)
 fastapi==0.110.0
-uvicorn==0.27.0
-psycopg2-binary==2.9.9
+uvicorn[standard]==0.27.0
 pydantic==2.6.0
+
+# Database (L4)
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.27
+
+# Gateway (L2)
+pyserial==3.5
+requests==2.31.0
+
+# Blockchain Integration (L5-L7)
+fabric-sdk-py==1.0.0
+
+# RAG Pipeline (L8-L11)
+langchain==0.1.0
+langchain-openai==0.0.5
+openai==1.12.0
+chromadb==0.4.22
+tiktoken==0.6.0
+
+# Utilities
+python-dotenv==1.0.0
+numpy==1.26.4
+pandas==2.2.0
+
+# Testing
+pytest==8.0.0
+httpx==0.27.0
