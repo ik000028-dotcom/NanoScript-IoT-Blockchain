@@ -337,8 +337,8 @@ class IoTHashContract extends Contract {
 
     async getAllSensors(ctx, startKey, endKey, pageSize) {
         const size = parseInt(pageSize) || 10;
-        const start = startKey || 'SENSOR0';
-        const end = endKey || 'SENSOR999999';
+        const start = startKey || 'sensor0';
+        const end = endKey || 'sensorzzzzzz';
         
         const iterator = await ctx.stub.getStateByRange(start, end);
         
