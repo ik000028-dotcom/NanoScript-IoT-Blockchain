@@ -1,32 +1,38 @@
 # NanoScript IoT Blockchain System
 
-## 🎯 Project Overview
+This document provides a step-by-step installation and configuration guide for a testing environment implementing an IoT data integrity system based on a permissioned blockchain network, integrated with a RAG pipeline and LLM for intelligent data querying.
 
-A complete end-to-end IoT data integrity system that combines:
-- **Arduino MKR Zero** with sensors (DHT11, GPS)
-- **FastAPI Backend** for data validation and hashing
-- **PostgreSQL + TimescaleDB** for time-series storage
-- **Hyperledger Fabric Blockchain** for immutable audit trails
-- **RAG Pipeline** with LLM for intelligent data querying
+
+> This repository provides a complete installation and configuration guide for a testing environment implementing an IoT monitoring system based on a permissioned blockchain network, integrated with a Retrieval-Augmented Generation (RAG) pipeline and a local Large Language Model for intelligent data querying. The system captures real-time environmental data (temperature, humidity, GPS) from an Arduino MKR Zero, validates and hashes every record through a FastAPI backend, anchors cryptographic proofs on a Hyperledger Fabric blockchain requiring dual-organisation endorsement, and exposes all verified data through a natural language chatbot interface powered by LangChain and llama3.2.
+
+---
+
+## Project Overview
+
+This system was built to solve a fundamental problem in IoT deployments: **raw sensor data cannot be trusted by default**. A database administrator, a software bug, or a malicious insider can modify historical readings without leaving any trace. This project addresses that problem by combining three technologies:
+
+- **Arduino MKR Zero + DHT11 + GPS** — physical sensing layer collecting temperature, humidity, and location data
+- **Hyperledger Fabric Blockchain** — permissioned ledger that anchors a SHA-256 hash of every sensor record, requiring endorsement from two independent organisations before any data is written
+- **RAG Pipeline (LangChain + ChromaDB + llama3.2)** — AI layer that makes blockchain-verified data queryable through natural language
+
+Any tampering with a stored record produces a hash mismatch detectable by the `verifyIntegrity` chaincode function, providing a cryptographic guarantee of data integrity from sensor to storage.
+
+
+Any tampering with a stored record produces a hash mismatch detectable by the `verifyIntegrity` chaincode function, providing a cryptographic guarantee of data integrity from sensor to storage.
+
+
+## Table of Contents
+
+1. [Project Overview](#project-overview)
+2. [System Architecture](#system-architecture)
+3. [Hardware Requirements](#hardware-requirements)
+4. [Software Stack](#software-stack)
+5. [Installation Guide](#installation-guide)
 
 
 ---
 
-## 📋 Table of Contents
-
-1. [System Architecture](#system-architecture)
-2. [Hardware Requirements](#hardware-requirements)
-3. [Software Stack](#software-stack)
-4. [Installation Guide](#installation-guide)
-5. [Layer-by-Layer Validation](#layer-by-layer-validation)
-6. [API Documentation](#api-documentation)
-7. [Blockchain Integration](#blockchain-integration)
-8. [Troubleshooting](#troubleshooting)
-
-
----
-
-## 🏗️ System Architecture
+## System Architecture
 ┌─────────────────┐
 │  Arduino MKR    │  L1: IoT Device
 │  Zero + Sensors │     (Temperature, Humidity, GPS)
@@ -77,7 +83,7 @@ A complete end-to-end IoT data integrity system that combines:
 
 ---
 
-## 💻 Hardware Requirements
+## Hardware Requirements
 
 ### Required Components
 
@@ -104,7 +110,7 @@ A complete end-to-end IoT data integrity system that combines:
 
 ---
 
-## 🛠️ Software Stack
+## Software Stack
 
 ### Core Technologies
 
@@ -126,7 +132,7 @@ A complete end-to-end IoT data integrity system that combines:
 
 ---
 
-## 📥 Installation Guide
+## Installation Guide
 
 ### Prerequisites
 
