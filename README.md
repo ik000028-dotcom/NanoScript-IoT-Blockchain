@@ -33,53 +33,7 @@ Any tampering with a stored record produces a hash mismatch detectable by the `v
 ---
 
 ## System Architecture
-┌─────────────────┐
-│  Arduino MKR    │  L1: IoT Device
-│  Zero + Sensors │     (Temperature, Humidity, GPS)
-└────────┬────────┘
-│ Serial USB
-▼
-┌─────────────────┐
-│  Python Gateway │  L2: Data Aggregation
-│  (gateway.py)   │     (Serial → HTTP)
-└────────┬────────┘
-│ HTTP POST
-▼
-┌─────────────────┐
-│  FastAPI        │  L3: Validation & Hashing
-│  Backend        │     (SHA-256 computation)
-└────────┬────────┘
-│ SQL + Hash
-▼
-┌─────────────────┐
-│  PostgreSQL +   │  L4: Trusted Registry
-│  TimescaleDB    │     (Time-series storage)
-└────────┬────────┘
-│ Batch Read
-▼
-┌─────────────────┐
-│  Batch Hash     │  L5: Batch Generator
-│  Generator      │     (Pre-computed hashes)
-└────────┬────────┘
-│ gRPC/HTTP
-▼
-┌─────────────────┐
-│  Hyperledger    │  L6: Smart Contract
-│  Fabric         │     (iot_hash chaincode)
-└────────┬────────┘
-│ Consensus
-▼
-┌─────────────────┐
-│  Blockchain     │  L7: Immutable Ledger
-│  Ledger         │     (Org1 + Org2 endorsement)
-└────────┬────────┘
-│ Verified Data
-▼
-┌─────────────────┐
-│  RAG Pipeline   │  L8-L11: AI Integration
-│  (LangChain +   │     (Vector DB + LLM)
-│   LLM)          │
-└─────────────────┘
+![System Architecture Diagram](./assets/architecture-diagram.png)
 
 ---
 
