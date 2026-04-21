@@ -33,7 +33,7 @@ Any tampering with a stored record produces a hash mismatch detectable by the `v
 ---
 
 ## System Architecture
-![System Architecture Diagram](./assets/architecture-diagram.png)
+![System Architecture Diagram](./assets/arch.png)
 
 ---
 
