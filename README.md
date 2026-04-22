@@ -170,3 +170,140 @@ cd chaincode/src
 npm install
 cd ../..
 cd ../..
+
+# 🔍 Layer-by-Layer Validation
+
+This section provides a step-by-step validation process for each layer of the system. It ensures that every component works correctly in isolation before running the full pipeline.
+
+---
+
+## L1 — IoT Device Validation (Arduino + Sensors)
+
+### Objective
+Verify that the Arduino correctly reads sensor data and outputs valid JSON.
+
+### Steps
+1. Connect the Arduino via USB  
+2. Open Arduino Serial Monitor  
+3. Set baud rate to 9600  
+
+### Expected Output
+```json
+{"type":"temperature","value":24.5}
+{"type":"humidity","value":60}
+{"type":"gps","gps_fix":false,"lat":null,"lon":null}
+Validation Checks
+Data updates every ~2 seconds
+No malformed JSON
+GPS:
+gps_fix: false indoors
+gps_fix: true outdoors
+L2 — Gateway Validation (gateway.py)
+Objective
+
+Ensure data is correctly sent from serial to FastAPI backend.
+
+Steps
+python gateway.py
+Expected Behavior
+JSON printed in console
+HTTP POST sent to backend
+Retry works if backend is down
+L3 — FastAPI Backend Validation
+Objective
+
+Confirm API receives data and hashes it correctly.
+
+Steps
+uvicorn main:app --reload
+
+Test:
+
+curl -X POST http://localhost:8000/data \
+-H "Content-Type: application/json" \
+-d '{"type":"temperature","value":25}'
+Expected
+200 OK response
+Data stored with SHA-256 hash
+L4 — Database Validation (PostgreSQL + TimescaleDB)
+Objective
+
+Verify data storage.
+
+Query
+SELECT * FROM sensor_data ORDER BY time DESC LIMIT 5;
+Expected
+Timestamp
+Sensor values
+Hash
+blockchain_tx = NULL
+L5 — Batch Generator Validation
+Objective
+
+Ensure unconfirmed records are retrieved.
+
+Test
+curl http://localhost:8000/batch/unconfirmed
+Expected
+[
+  {
+    "id": 123,
+    "hash": "abc123...",
+    "recomputed": false
+  }
+]
+L6 — Chaincode Validation (Hyperledger Fabric)
+Objective
+
+Verify blockchain logic.
+
+Steps
+peer chaincode invoke ...
+peer chaincode query ...
+Expected
+Endorsed by Org1 and Org2
+Hash stored successfully
+L7 — Blockchain Ledger Validation
+Objective
+
+Ensure immutability.
+
+Test
+peer chaincode query -C mychannel -n iot -c '{"Args":["queryHash","abc123"]}'
+Expected
+Valid transaction
+Same result across peers
+L8 — Vector Database Validation (ChromaDB)
+Objective
+
+Verify embeddings.
+
+Expected
+~1000 documents
+Each contains sensor + hash
+L9 — LangChain Validation
+Test Query
+
+"What is the weather like?"
+
+Expected
+Relevant sensor data retrieved
+L10 — LLM Validation (Ollama)
+Test
+ollama run llama3.2
+Expected
+Grounded answers
+No hallucination
+L11 — Streamlit Interface Validation
+Run
+streamlit run app.py
+Expected
+Chat interface loads
+Answers + raw data visible
+Final Validation
+
+If all layers pass:
+
+Data flows end-to-end
+Blockchain verification works
+AI responses are accurate
