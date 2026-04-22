@@ -171,6 +171,8 @@ npm install
 cd ../..
 cd ../..
 
+---
+
 ## Layer-by-Layer Validation
 
 This section provides a step-by-step validation process for each layer of the system. It ensures that every component works correctly in isolation before running the full pipeline.
