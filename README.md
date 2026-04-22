@@ -32,6 +32,7 @@ Any tampering with a stored record produces a hash mismatch detectable by the `v
 7. [API Documentation](#api-documentation)
 8. [Blockchain Integration](#blockchain-integration)
 9. [Troubleshooting](#troubleshooting)
+10. [Project Configuration](#project-configuration)
 
 
 ---
