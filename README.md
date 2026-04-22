@@ -689,3 +689,173 @@ Arduino → FastAPI (SHA-256 computed) → PostgreSQL (hash stored)
 ```
 
 If any record in PostgreSQL is modified after blockchain submission, `verifyIntegrity()` will return `false` — proving tampering occurred.
+
+
+## Troubleshooting
+
+This section documents real errors encountered during system verification and their exact fixes.
+
+---
+
+### Gateway fails to start — Serial port not found
+
+**Error:**
+```
+SerialException: could not open port /dev/tty.usbmodem101: No such file or directory
+```
+
+**Cause:** The Arduino's USB port enumerated with a different name (`usbmodem1101` instead 
+of `usbmodem101`).
+
+**Fix:**
+```bash
+# First confirm the actual port name
+ls -la /dev/tty.usbmodem*
+
+# Then update gateway.py automatically
+sed -i '' 's/tty.usbmodem101/tty.usbmodem1101/g' \
+  ~/Documents/PlatformIO/Projects/MKRZeroTest/gateway.py && echo "✅ Port updated"
+```
+
+---
+
+### Blockchain peer refuses connection
+
+**Error:**
+```
+connection error: desc = "transport: error while dialing: dial tcp [::1]:7051: connect: connection refused"
+```
+
+**Cause:** The Hyperledger Fabric Docker containers are not running.
+
+**Fix:**
+```bash
+cd ~/fabric-samples/test-network
+./network.sh up
+```
+
+Then re-source the org environment and retry:
+```bash
+source ~/NanoScript-IoT-Blockchain/env/org1/env.sh
+peer chaincode query -C mychannel -n iot_hash \
+  -c '{"function":"getAllSensors","Args":["","","10"]}'
+```
+
+---
+
+### Gateway shows "Failed to send" errors
+
+**Cause:** FastAPI backend is not yet running. The gateway starts before FastAPI and 
+cannot reach `http://localhost:8000/data`.
+
+**Fix:** This is expected behavior. Start FastAPI (Step 3) and the errors will stop 
+automatically. The gateway retries every reading — no data is lost.
+
+---
+
+### Streamlit shows `ModuleNotFoundError: No module named 'torchvision'`
+
+**Error:**
+```
+ModuleNotFoundError: No module named 'torchvision'
+```
+
+**Cause:** A `transformers` library sub-module tries to import `torchvision`, which is 
+not installed. This does not affect any functionality used by this project.
+
+**Fix:** This is a harmless warning — not an error. Confirm Streamlit started correctly:
+```bash
+curl -s http://localhost:8501 | head -5
+```
+
+If HTML is returned, the app is running. Open `http://localhost:8501` in your browser normally.
+
+---
+
+### GPS always shows `gps_fix: false`
+
+**Cause:** The Arduino GPS shield requires a clear view of the sky to acquire a satellite 
+fix. Indoors, walls block the signal and no fix is possible.
+
+**Fix:** Take the Arduino outside and wait 1–2 minutes. Once a fix is acquired, the 
+output will change from:
+```json
+{"type":"gps","gps_fix":false,"lat":null,"lon":null}
+```
+to:
+```json
+{"type":"gps","gps_fix":true,"lat":51.5074,"lon":-0.1278}
+```
+
+> All four services (Fabric, Gateway, FastAPI, Streamlit) must be running before going 
+> outdoors so that GPS coordinates are stored automatically when the fix is acquired.
+
+---
+
+### PostgreSQL connection refused
+
+**Cause:** The PostgreSQL service is not running.
+
+**Fix (macOS):**
+```bash
+brew services start postgresql
+# or
+pg_ctl -D /usr/local/var/postgres start
+```
+
+Verify the database is reachable:
+```bash
+psql -U ikramsmac -d iot_data -c "SELECT 1;"
+```
+
+---
+
+### ChromaDB collection not found
+
+**Error:**
+```
+ValueError: Collection 'sensor_logs' does not exist
+```
+
+**Cause:** The ChromaDB persistent directory is missing or the ingestion script has 
+not been run yet.
+
+**Fix:** Re-run the ingestion script to populate the vector database:
+```bash
+cd ~/Documents/PlatformIO/Projects/MKRZeroTest
+source venv/bin/activate
+python ingest.py
+```
+
+Verify after ingestion:
+```bash
+python -c "
+import chromadb
+client = chromadb.PersistentClient(path='./chroma_db')
+col = client.get_collection('sensor_logs')
+print(f'Total documents: {col.count()}')
+"
+```
+
+Expected: `Total documents: 1000`
+
+---
+
+### verifyIntegrity returns false
+
+**Cause:** The hash stored in PostgreSQL no longer matches the hash anchored on the 
+blockchain — this indicates the database record was modified after blockchain submission.
+
+**Diagnosis:**
+```bash
+# Query the blockchain hash
+peer chaincode query -C mychannel -n iot_hash \
+  -c '{"function":"queryHash","Args":["sensor001"]}'
+
+# Compare with the PostgreSQL hash
+psql -U ikramsmac -d iot_data \
+  -c "SELECT hash FROM sensor_data WHERE id = 1;"
+```
+
+If the two hashes differ, the PostgreSQL record has been altered. The blockchain hash 
+is the authoritative source of truth.
