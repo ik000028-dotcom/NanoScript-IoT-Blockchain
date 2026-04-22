@@ -311,3 +311,163 @@ If all layers pass:
 Data flows end-to-end
 Blockchain verification works
 AI responses are accurate
+
+## API Documentation
+
+This section documents all HTTP endpoints exposed by the FastAPI backend (`main.py`), running on `http://localhost:8000`.
+
+---
+
+### Base URL
+
+```
+http://localhost:8000
+```
+
+---
+
+### Endpoints
+
+---
+
+#### `POST /data`
+
+Receives a sensor reading from the gateway, validates it, computes a SHA-256 hash, and stores it in PostgreSQL.
+
+**Request Headers**
+
+| Header         | Value              |
+|----------------|--------------------|
+| Content-Type   | application/json   |
+
+**Request Body**
+
+For a temperature reading:
+```json
+{
+  "type": "temperature",
+  "value": 24.5
+}
+```
+
+For a humidity reading:
+```json
+{
+  "type": "humidity",
+  "value": 60
+}
+```
+
+For a GPS reading (indoors):
+```json
+{
+  "type": "gps",
+  "gps_fix": false,
+  "lat": null,
+  "lon": null
+}
+```
+
+For a GPS reading (outdoors):
+```json
+{
+  "type": "gps",
+  "gps_fix": true,
+  "lat": 51.5074,
+  "lon": -0.1278
+}
+```
+
+**Response**
+
+```json
+{
+  "status": "ok",
+  "hash": "e3b0c44298fc1c149afb..."
+}
+```
+
+| Field    | Type   | Description                              |
+|----------|--------|------------------------------------------|
+| `status` | string | `"ok"` on successful storage            |
+| `hash`   | string | SHA-256 hash of the stored payload       |
+
+**Example cURL**
+
+```bash
+curl -X POST http://localhost:8000/data \
+  -H "Content-Type: application/json" \
+  -d '{"type":"temperature","value":25}'
+```
+
+**Expected Result**
+- `200 OK` response
+- Data stored in PostgreSQL with SHA-256 hash
+- `blockchain_tx` field set to `NULL` (pending blockchain confirmation)
+
+---
+
+#### `GET /batch/unconfirmed`
+
+Returns all sensor records that have not yet been submitted to the Hyperledger Fabric blockchain (i.e. where `blockchain_tx IS NULL`). Used by the Batch Hash Generator (L5) to prepare records for blockchain submission.
+
+**Request**
+
+No body or parameters required.
+
+```bash
+curl http://localhost:8000/batch/unconfirmed
+```
+
+**Response**
+
+```json
+[
+  {
+    "id": 1,
+    "timestamp": "2025-04-22T13:00:01.123Z",
+    "type": "temperature",
+    "value": 24.5,
+    "hash": "e3b0c44298fc1c149afb...",
+    "recomputed": false,
+    "blockchain_tx": null
+  },
+  {
+    "id": 2,
+    "timestamp": "2025-04-22T13:00:03.456Z",
+    "type": "humidity",
+    "value": 60,
+    "hash": "a87ff679a2f3e71d9181...",
+    "recomputed": false,
+    "blockchain_tx": null
+  }
+]
+```
+
+| Field           | Type    | Description                                                  |
+|-----------------|---------|--------------------------------------------------------------|
+| `id`            | integer | Auto-incremented record ID                                   |
+| `timestamp`     | string  | ISO 8601 timestamp of the reading                            |
+| `type`          | string  | Sensor type: `temperature`, `humidity`, or `gps`            |
+| `value`         | float   | Sensor reading value                                         |
+| `hash`          | string  | SHA-256 hash computed at ingestion time (L3)                |
+| `recomputed`    | boolean | `false` = hash came from L3, not recomputed later           |
+| `blockchain_tx` | null    | `null` until the record is confirmed on the blockchain       |
+
+---
+
+### Error Responses
+
+| HTTP Code | Meaning                                      |
+|-----------|----------------------------------------------|
+| `200 OK`  | Request successful                           |
+| `422 Unprocessable Entity` | Payload failed Pydantic validation |
+| `500 Internal Server Error` | Database or hashing failure       |
+
+---
+
+### Notes
+
+- All hashes are computed using **SHA-256** at ingestion time and are never recomputed after storage.
+- The `blockchain_tx` field is populated once the hash is anchored on **Hyperledger Fabric** (L6–L7).
+- The FastAPI backend uses **Pydantic** for strict payload validation — malformed or missing fields will return a `422` error.
