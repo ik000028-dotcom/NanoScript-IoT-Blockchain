@@ -100,31 +100,72 @@ python3.10 -m venv venv
 source venv/bin/activate
 pip install fastapi uvicorn psycopg2-binary pydantic
 
-## 🔍 Layer-by-Layer Validation
-To ensure the integrity of the 11-layer pipeline, follow these validation steps:
+⛓️ Hyperledger Fabric Installation Guide
+This guide details the step-by-step process for installing a permissioned blockchain environment to support the NanoScript-IoT-Blockchain framework.
 
-1. **Perception Layer (L1-L2):** Open the Arduino Serial Monitor. Verify JSON packets are transmitting: `{"temp": 21.0, "hum": 17.0, "gps": [...]}`.
-2. **Blockchain Layer (L6-L7):** Verify the ledger is recording hashes by querying the channel:
-   \`\`\`bash
-   peer chaincode query -C mychannel -n iot_hash -c '{"function":"getAllSensors","Args":["","","10"]}'
-   \`\`\`
-3. **Intelligence Layer (L9-L11):** Run the local test script to verify RAG retrieval:
-   \`\`\`bash
-   python test_llm.py
-   \`\`\`
-   *Success Condition:* The AI returns a response labeled "Verified" based on the last 50 ledger records.
+1. System Prerequisites
+Hyperledger Fabric requires several underlying technologies. Run the following commands to ensure your environment is ready:
 
-## 📝 API Documentation (Chaincode Functions)
-The Smart Contract (\`iot_hash.js\`) exposes the following functions via the Fabric Gateway:
+Docker & Docker Compose: To host the blockchain nodes (Peers, Orderers, CAs).
 
-* **createSensor(ID, Hash, Owner):** Commits a new SHA-256 sensor batch hash to the ledger.
-* **querySensor(ID):** Returns the world-state data and transaction history for a specific sensor ID.
-* **getAllSensors(start, end, limit):** Range query to retrieve historical batches for AI analysis.
-* **transferOwnership(ID, newOwner):** Updates the permissioned MSP owner of a specific data asset.
+Node.js (v18.x): Required for the JavaScript chaincode execution.
 
-## 🛠️ Troubleshooting
-| Problem | Solution |
-| :--- | :--- |
-| **Docker containers not found** | Run \`docker ps -a\`. If stopped, restart with \`docker-compose up -d\`. |
-| **Chaincode broken/missing** | Restore from \`chaincode/backup/\` and run your redeploy script. |
-| **RAG returns no data** | Ensure the vector DB is synced: \`python ingest_to_vector.py\`. |
+Python (3.10+): Required for the FastAPI backend and RAG gateway.
+
+Bash
+# For macOS (Using Homebrew)
+brew install git curl node@18 python@3.10 docker docker-compose
+2. Install Fabric Binaries and Docker Images
+This project is optimized for Hyperledger Fabric v2.5.4 (LTS). Execute the official bootstrap script to download the Fabric samples, the required binaries (peer, orderer, configtxgen), and the official Docker images:
+
+Bash
+# Downloads binaries and Docker images for version 2.5.4
+curl -sSL https://bit.ly/2ysbOFE | bash -s -- 2.5.4 1.5.7
+3. Environment Configuration
+Add the downloaded binaries to your system's PATH and define the configuration path so the system can locate the peer CLI:
+
+Bash
+# Add these lines to your ~/.zshrc or ~/.bashrc
+export PATH=$PWD/bin:$PATH
+export FABRIC_CFG_PATH=$PWD/config/
+4. Smart Contract (Chaincode) Dependencies
+Since the project uses Node.js for the Smart Contract (iot_hash.js), you must install the Fabric Contract SDK dependencies before deployment:
+
+Bash
+cd chaincode/src
+npm install⛓️ Hyperledger Fabric Installation Guide
+This guide details the step-by-step process for installing a permissioned blockchain environment to support the NanoScript-IoT-Blockchain framework.
+
+1. System Prerequisites
+Hyperledger Fabric requires several underlying technologies. Run the following commands to ensure your environment is ready:
+
+Docker & Docker Compose: To host the blockchain nodes (Peers, Orderers, CAs).
+
+Node.js (v18.x): Required for the JavaScript chaincode execution.
+
+Python (3.10+): Required for the FastAPI backend and RAG gateway.
+
+Bash
+# For macOS (Using Homebrew)
+brew install git curl node@18 python@3.10 docker docker-compose
+2. Install Fabric Binaries and Docker Images
+This project is optimized for Hyperledger Fabric v2.5.4 (LTS). Execute the official bootstrap script to download the Fabric samples, the required binaries (peer, orderer, configtxgen), and the official Docker images:
+
+Bash
+# Downloads binaries and Docker images for version 2.5.4
+curl -sSL https://bit.ly/2ysbOFE | bash -s -- 2.5.4 1.5.7
+3. Environment Configuration
+Add the downloaded binaries to your system's PATH and define the configuration path so the system can locate the peer CLI:
+
+Bash
+# Add these lines to your ~/.zshrc or ~/.bashrc
+export PATH=$PWD/bin:$PATH
+export FABRIC_CFG_PATH=$PWD/config/
+4. Smart Contract (Chaincode) Dependencies
+Since the project uses Node.js for the Smart Contract (iot_hash.js), you must install the Fabric Contract SDK dependencies before deployment:
+
+Bash
+cd chaincode/src
+npm install
+cd ../..
+cd ../..
