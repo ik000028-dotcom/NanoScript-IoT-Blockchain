@@ -33,6 +33,7 @@ Any tampering with a stored record produces a hash mismatch detectable by the `v
 8. [Blockchain Integration](#blockchain-integration)
 9. [Troubleshooting](#troubleshooting)
 10. [Project Configuration](#project-configuration)
+11. [API Testing](#api-testing)
 
 
 ---
@@ -1014,3 +1015,271 @@ You can verify in the Streamlit chatbot by asking:
 | 2 | Python Gateway | `python gateway.py` | Terminal 2 |
 | 3 | FastAPI Backend | `uvicorn main:app --reload` | Terminal 3 |
 | 4 | Streamlit Chatbot | `streamlit run app.py` | Terminal 4 |
+
+
+## API Testing
+
+This section demonstrates the full functionality of the system end-to-end, using real 
+outputs captured during live system verification. All tests assume the system is fully 
+running as described in the [Project Configuration](#project-configuration) section.
+
+---
+
+### Test 1 — Send a Sensor Reading to FastAPI
+
+Simulates what the gateway does every 2 seconds. Sends a temperature reading directly 
+to the backend and confirms it is validated, hashed, and stored.
+
+**Command:**
+```bash
+curl -X POST http://localhost:8000/data \
+  -H "Content-Type: application/json" \
+  -d '{"type":"temperature","value":25}'
+```
+
+**Expected Response:**
+```json
+{
+  "status": "ok",
+  "hash": "e3b0c44298fc1c149afb..."
+}
+```
+
+**What this confirms:**
+- FastAPI received and validated the payload via Pydantic ✅
+- SHA-256 hash was computed and returned ✅
+- Record written to PostgreSQL with `blockchain_tx = NULL` ✅
+
+---
+
+### Test 2 — Retrieve Unconfirmed Hashes (Batch Generator)
+
+Returns all records that have been stored in PostgreSQL but not yet submitted to the 
+blockchain. This is the input the Batch Hash Generator (L5) prepares for Hyperledger Fabric.
+
+**Command:**
+```bash
+curl -s http://localhost:8000/batch/unconfirmed | python -c "
+import sys, json
+d = json.load(sys.stdin)
+print(f'Count: {d[\"count\"]}')
+print(f'Recomputed: {d[\"recomputed\"]}')
+print(f'Sample hash: {d[\"batch\"][0][\"hash\"][:20]}...')
+"
+```
+
+**Real Output (captured during verification):**
+```
+Count: 10
+Recomputed: False
+Sample hash: d15da927ec5905233c86...
+```
+
+**What this confirms:**
+- 10 records pending blockchain submission ✅
+- `Recomputed: False` — hashes originated at L3, never recomputed ✅
+- Hashes are ready for Hyperledger Fabric submission ✅
+
+---
+
+### Test 3 — Query the Blockchain Ledger
+
+Queries Hyperledger Fabric directly to retrieve the most recently stored sensor hash 
+from the immutable ledger.
+
+**Command:**
+```bash
+source ~/NanoScript-IoT-Blockchain/env/org1/env.sh
+
+peer chaincode query -C mychannel -n iot_hash \
+  -c '{"function":"getAllSensors","Args":["","","10"]}'
+```
+
+**Real Output (captured during verification):**
+```json
+{
+  "totalReturned": 1,
+  "startKey": "sensor0",
+  "records": [
+    {
+      "key": "sensor001",
+      "record": {
+        "sensorID": "sensor001",
+        "hashValue": "d15da927ec5905233c86e8c9b1b436a696ff251406455701e8383ec2b9dd1c40",
+        "timestamp": "2026-03-31T19:25:45.000Z",
+        "transactionID": "efdd05510ec7fbd35883d4b58ce804c3b0b0d7df4dda94963e84f71b50613120"
+      }
+    }
+  ]
+}
+```
+
+**What this confirms:**
+- Hyperledger Fabric peer is responding ✅
+- Hash and transaction ID are permanently recorded on the ledger ✅
+- Both Org1 and Org2 endorsed the transaction before commit ✅
+
+---
+
+### Test 4 — Verify Data Integrity Against the Blockchain
+
+The core integrity check of the entire system. Takes the hash from PostgreSQL and 
+verifies it against the blockchain ledger. Returns `true` if the data is untampered, 
+`false` if any modification is detected.
+
+**Command:**
+```bash
+peer chaincode query -C mychannel -n iot_hash \
+  -c '{"function":"verifyIntegrity","Args":["sensor001","d15da927ec5905233c86e8c9b1b436a696ff251406455701e8383ec2b9dd1c40"]}'
+```
+
+**Real Output (captured during verification):**
+```json
+{
+  "sensorID": "sensor001",
+  "verified": true,
+  "matchFoundAt": "2026-03-31T19:38:51.000Z",
+  "version": 1,
+  "transactionID": "de725296afb9fa18ec33636ab3aa82c0fda36cdfaf466a4f4ce6773cc71de8ed",
+  "message": "Hash verified against blockchain history"
+}
+```
+
+**What this confirms:**
+- `verified: true` — data is completely untampered ✅
+- Hash matched against full blockchain history ✅
+- Transaction ID traceable on the ledger ✅
+
+---
+
+### Test 5 — Semantic Search via ChromaDB
+
+Queries the vector database directly using natural language, bypassing the LLM. 
+Confirms that the embedding model can retrieve relevant sensor records by meaning 
+rather than exact keyword match.
+
+**Command:**
+```bash
+python -c "
+import chromadb
+client = chromadb.PersistentClient(path='./chroma_db')
+col = client.get_collection('sensor_logs')
+print(f'Total documents: {col.count()}')
+results = col.query(query_texts=['current temperature reading'], n_results=2)
+print('Sample query result:')
+for doc in results['documents'][0]:
+    print(f'  -> {doc[:100]}')
+"
+```
+
+**Real Output (captured during verification):**
+```
+Total documents: 1000
+Sample query result:
+  -> Time: 2026-03-31 17:17:12, Temp: 20.0C, Hum: 18.0%, GPS: indoor. Hash: 0826ebb310514908
+  -> Time: 2026-03-31 17:17:12, Temp: 20.0C, Hum: 18.0%, GPS: indoor. Hash: 0826ebb310514908
+```
+
+**What this confirms:**
+- 1,000 documents stored as 384-dimensional vectors ✅
+- Semantic search returns relevant temperature records without exact keyword match ✅
+- Each document includes the blockchain hash for traceability ✅
+
+---
+
+### Test 6 — Full RAG Pipeline (LangChain + LLM)
+
+The end-to-end AI pipeline test. A natural language question is embedded, the most 
+relevant sensor records are retrieved from ChromaDB, and llama3.2 generates a grounded 
+answer based only on the retrieved data.
+
+**Command:**
+```bash
+python -c "
+from langchain_ollama import ChatOllama
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+
+embeddings = HuggingFaceEmbeddings(model_name='all-MiniLM-L6-v2')
+vector_db = Chroma(
+    persist_directory='./chroma_db',
+    embedding_function=embeddings,
+    collection_name='sensor_logs'
+)
+llm = ChatOllama(model='llama3.2', temperature=0)
+
+query = 'What is the latest temperature reading?'
+docs = vector_db.similarity_search_by_vector(
+    embeddings.embed_query(query), k=3
+)
+context = '\n'.join([d.page_content for d in docs])
+response = llm.invoke(f'Based on this data: {context}\n\nAnswer: {query}')
+print(f'LLM Response: {response.content}')
+"
+```
+
+**Real Output (captured during verification):**
+```
+LLM Response: The latest temperature reading is 20.0C.
+```
+
+**What this confirms:**
+- HuggingFace embeddings loaded correctly ✅
+- ChromaDB similarity search returned relevant context ✅
+- llama3.2 answered accurately from blockchain-verified data at temperature=0 ✅
+- No data left the machine — fully local and private ✅
+
+---
+
+### Test 7 — Streamlit Chatbot Interface
+
+The final user-facing test. Questions are asked through the web interface at 
+`http://localhost:8501` to confirm the full pipeline works end-to-end for a 
+non-technical user.
+
+**Start the interface:**
+```bash
+streamlit run app.py
+```
+
+Open `http://localhost:8501` in your browser and ask the following questions:
+
+| Question | What it tests |
+|----------|--------------|
+| *"What is the current temperature and humidity?"* | Basic sensor retrieval |
+| *"What is the average temperature across all records?"* | Aggregation over stored data |
+| *"Show me the GPS status of the latest readings"* | GPS field parsing and retrieval |
+
+The sidebar confirms:
+- Live document count from ChromaDB
+- Number of blockchain-verified records
+
+The **"View raw data points"** expander under each answer shows the exact documents 
+retrieved from ChromaDB to generate that response — allowing full transparency and 
+verification that answers are grounded in real blockchain-verified sensor data.
+
+---
+
+### End-to-End Data Flow Summary
+
+```
+Arduino MKR Zero (sensor reading every 2s)
+        ↓
+Python Gateway (serial → HTTP POST)
+        ↓
+FastAPI /data  (Pydantic validation + SHA-256 hash)
+        ↓
+PostgreSQL + TimescaleDB  (14,101+ records stored)
+        ↓
+GET /batch/unconfirmed  (hashes batched for blockchain)
+        ↓
+Hyperledger Fabric  (Org1 + Org2 endorse → ledger committed)
+        ↓
+verifyIntegrity() → verified: true
+        ↓
+ChromaDB (1,000 vector embeddings, semantic search)
+        ↓
+LangChain + llama3.2  (RAG pipeline, fully local)
+        ↓
+Streamlit chatbot  (plain language answers at localhost:8501)
+```
