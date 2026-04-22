@@ -312,6 +312,8 @@ Data flows end-to-end
 Blockchain verification works
 AI responses are accurate
 
+```
+
 ## API Documentation
 
 This section documents all HTTP endpoints exposed by the FastAPI backend (`main.py`), running on `http://localhost:8000`.
