@@ -860,3 +860,157 @@ psql -U ikramsmac -d iot_data \
 
 If the two hashes differ, the PostgreSQL record has been altered. The blockchain hash 
 is the authoritative source of truth.
+
+
+## Project Configuration
+
+This section describes the exact sequence of steps to start the full system from scratch. 
+Every command must be run in the order shown below. Each step requires its own terminal 
+window — do not close any terminal once a service is running.
+
+---
+
+### Prerequisites Check
+
+Before starting, confirm the Arduino is connected:
+
+```bash
+ls -la /dev/tty.usbmodem* 2>/dev/null && echo "✅ Arduino CONNECTED" || echo "❌ Arduino NOT connected"
+```
+
+Expected output:
+```
+crw-rw-rw-  1 root  wheel  0x9000004 Apr 22 01:32 /dev/tty.usbmodem1101
+✅ Arduino CONNECTED
+```
+
+> If the port shown is `/dev/tty.usbmodem1101`, make sure `gateway.py` uses that exact value.
+> If it was previously set to `/dev/tty.usbmodem101`, fix it with:
+> ```bash
+> sed -i '' 's/tty.usbmodem101/tty.usbmodem1101/g' \
+>   ~/Documents/PlatformIO/Projects/MKRZeroTest/gateway.py
+> ```
+
+---
+
+### Step 1 — Start the Hyperledger Fabric Network (Terminal 1)
+
+```bash
+cd ~/fabric-samples/test-network
+./network.sh up
+```
+
+Wait until you see all containers running, then verify the chaincode is reachable:
+
+```bash
+source ~/NanoScript-IoT-Blockchain/env/org1/env.sh
+peer chaincode query -C mychannel -n iot_hash \
+  -c '{"function":"getAllSensors","Args":["","","10"]}'
+```
+
+Expected: a JSON response containing `sensorID`, `hashValue`, and `transactionID`.
+
+---
+
+### Step 2 — Start the Python Gateway (Terminal 2)
+
+```bash
+cd ~/Documents/PlatformIO/Projects/MKRZeroTest
+source venv/bin/activate
+python gateway.py
+```
+
+Expected output (continuous stream):
+```
+{"type":"temperature","value":24.5} → sent
+{"type":"humidity","value":60} → sent
+{"type":"gps","gps_fix":false,"lat":null,"lon":null} → sent
+```
+
+> Keep this terminal open. The gateway reads from the Arduino every ~2 seconds and forwards 
+> each reading to FastAPI. If FastAPI is not yet running, you will see "Failed to send" — 
+> this is normal and the gateway will retry automatically.
+
+---
+
+### Step 3 — Start the FastAPI Backend (Terminal 3)
+
+```bash
+cd ~/Documents/PlatformIO/Projects/MKRZeroTest
+source venv/bin/activate
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Expected output once ready:
+```
+Application startup complete.
+INFO: 127.0.0.1 - "POST /data HTTP/1.1" 200 OK
+INFO: 127.0.0.1 - "POST /data HTTP/1.1" 200 OK
+```
+
+A continuous stream of `200 OK` responses confirms that sensor data is being validated, 
+hashed, and stored in PostgreSQL in real time.
+
+---
+
+### Step 4 — Verify the Database (Optional Spot Check)
+
+In any terminal with the venv active:
+
+```bash
+psql -U ikramsmac -d iot_data -c \
+  "SELECT COUNT(*) as total_records, MAX(time) as latest_record FROM sensor_data;"
+```
+
+Expected output:
+```
+ total_records |         latest_record
+---------------+-------------------------------
+         14101 | 2026-04-22 01:37:32.585723-07
+(1 row)
+```
+
+---
+
+### Step 5 — Start the Streamlit Chatbot (Terminal 4)
+
+```bash
+cd ~/Documents/PlatformIO/Projects/MKRZeroTest
+source venv/bin/activate
+streamlit run app.py
+```
+
+Once started, open your browser at:
+```
+http://localhost:8501
+```
+
+The chatbot sidebar will show the live document count from ChromaDB (1,000 documents) 
+and the verified record count from the blockchain.
+
+---
+
+### Step 6 — GPS Outdoor Test (Optional)
+
+Once all four services are running (Fabric, Gateway, FastAPI, Streamlit), take the 
+Arduino MKR Zero outside. The GPS shield will acquire a satellite fix within 1–2 minutes. 
+Once fixed, the gateway will automatically forward real coordinates:
+
+```json
+{"type":"gps","gps_fix":true,"lat":51.5074,"lon":-0.1278}
+```
+
+No extra steps are needed — the coordinates will be stored and hashed in real time. 
+You can verify in the Streamlit chatbot by asking:
+> *"Show me the GPS status of the latest readings"*
+
+---
+
+### System Startup Summary
+
+| Order | Service | Command | Terminal |
+|-------|---------|---------|----------|
+| 1 | Hyperledger Fabric | `./network.sh up` | Terminal 1 |
+| 2 | Python Gateway | `python gateway.py` | Terminal 2 |
+| 3 | FastAPI Backend | `uvicorn main:app --reload` | Terminal 3 |
+| 4 | Streamlit Chatbot | `streamlit run app.py` | Terminal 4 |
