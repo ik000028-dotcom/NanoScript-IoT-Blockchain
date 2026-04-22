@@ -29,6 +29,7 @@ Any tampering with a stored record produces a hash mismatch detectable by the `v
 4. [Software Stack](#software-stack)
 5. [Installation Guide](#installation-guide)
 6. [Layer-by-Layer Validation](#layer-by-layer-validation)
+7. [API Documentation](#api-documentation)
 
 
 ---
