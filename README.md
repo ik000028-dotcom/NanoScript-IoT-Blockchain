@@ -474,7 +474,7 @@ curl http://localhost:8000/batch/unconfirmed
 - All hashes are computed using **SHA-256** at ingestion time and are never recomputed after storage.
 - The `blockchain_tx` field is populated once the hash is anchored on **Hyperledger Fabric** (L6–L7).
 - The FastAPI backend uses **Pydantic** for strict payload validation — malformed or missing fields will return a `422` error.
-```
+
 
 ## Blockchain Integration
 
