@@ -474,3 +474,217 @@ curl http://localhost:8000/batch/unconfirmed
 - All hashes are computed using **SHA-256** at ingestion time and are never recomputed after storage.
 - The `blockchain_tx` field is populated once the hash is anchored on **Hyperledger Fabric** (L6–L7).
 - The FastAPI backend uses **Pydantic** for strict payload validation — malformed or missing fields will return a `422` error.
+```
+
+## Blockchain Integration
+
+This section explains how the Hyperledger Fabric blockchain is integrated into the system and how to start, interact with, and verify the blockchain network — including on a new machine such as a supervisor's PC.
+
+---
+
+### Overview
+
+The blockchain layer (L6–L7) anchors the SHA-256 hashes of all sensor readings onto an immutable ledger. Even if the PostgreSQL database is fully compromised and all records are altered, the hashes on the blockchain remain unchanged — making any tampering immediately detectable.
+
+The network consists of:
+
+| Component | Details |
+|-----------|---------|
+| Fabric version | Hyperledger Fabric v2.5.15 |
+| Chaincode | `iot_hash.js` (Node.js) |
+| Channel | `mychannel` |
+| Org1 Peer | `peer0.org1.example.com` — port `7051` |
+| Org2 Peer | `peer0.org2.example.com` — port `9051` |
+| Endorsement policy | Both Org1 AND Org2 must sign every transaction |
+
+---
+
+### Prerequisites (Supervisor PC Setup)
+
+Before running the blockchain, ensure the following are installed:
+
+**1. Docker and Docker Compose**
+```bash
+docker --version        # Docker 20.x or higher
+docker compose version  # v2.x or higher
+```
+
+If not installed:
+```bash
+# macOS
+brew install docker
+
+# Ubuntu/Debian
+sudo apt-get install docker.io docker-compose-v2
+```
+
+**2. Node.js (v18 or higher)**
+```bash
+node --version   # should be v18+
+npm --version
+```
+
+**3. Hyperledger Fabric Binaries and Docker Images**
+```bash
+curl -sSL https://bit.ly/2ysbOFE | bash -s -- 2.5.15 1.5.9
+```
+
+This downloads the `fabric-samples` binaries (`peer`, `orderer`, `configtxgen`, etc.) and all required Docker images.
+
+**4. Add Fabric binaries to PATH**
+```bash
+export PATH=$PATH:$(pwd)/fabric-samples/bin
+export FABRIC_CFG_PATH=$(pwd)/fabric-samples/config/
+```
+
+> Add these lines to your `~/.bashrc` or `~/.zshrc` to make them permanent.
+
+---
+
+### Starting the Blockchain Network
+
+From the root of the project:
+
+**Step 1 — Start the Fabric test network**
+```bash
+cd fabric-samples/test-network
+./network.sh up createChannel -c mychannel -ca
+```
+
+Expected output:
+```
+Creating channel 'mychannel'...
+Channel 'mychannel' joined
+```
+
+**Step 2 — Deploy the chaincode**
+```bash
+./network.sh deployCC -ccn iot_hash -ccp ../../chaincode -ccl node
+```
+
+Expected output:
+```
+Chaincode definition committed on channel 'mychannel'
+```
+
+> Both Org1 and Org2 must approve the chaincode before it is committed — this is enforced automatically by the script and reflects the endorsement policy.
+
+---
+
+### Chaincode Functions
+
+The chaincode (`iot_hash.js`) exposes four functions:
+
+#### `storeHashWithHistory`
+Stores a sensor hash on the ledger with a full history trail.
+
+```bash
+peer chaincode invoke \
+  -o localhost:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  --tls --cafile "${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem" \
+  -C mychannel -n iot_hash \
+  --peerAddresses localhost:7051 \
+  --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" \
+  --peerAddresses localhost:9051 \
+  --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" \
+  -c '{"function":"storeHashWithHistory","Args":["sensor_001","e3b0c44298fc1c149afb...","2025-04-22T13:00:01Z"]}'
+```
+
+Expected output:
+```
+[chaincodeCmd] chaincodeInvokeOrQuery -> INFO Chaincode invoke successful. result: status:200
+```
+
+---
+
+#### `queryHash`
+Retrieves the stored hash for a given sensor ID.
+
+```bash
+peer chaincode query \
+  -C mychannel -n iot_hash \
+  -c '{"function":"queryHash","Args":["sensor_001"]}'
+```
+
+Expected output:
+```json
+{
+  "sensorId": "sensor_001",
+  "hash": "e3b0c44298fc1c149afb...",
+  "timestamp": "2025-04-22T13:00:01Z"
+}
+```
+
+---
+
+#### `getHistory`
+Returns the full submission history for a sensor ID — every hash ever stored for that sensor.
+
+```bash
+peer chaincode query \
+  -C mychannel -n iot_hash \
+  -c '{"function":"getHistory","Args":["sensor_001"]}'
+```
+
+---
+
+#### `verifyIntegrity`
+Checks whether a given hash matches any historical record for a sensor. Returns `true` if the data is intact, `false` if tampering is detected.
+
+```bash
+peer chaincode query \
+  -C mychannel -n iot_hash \
+  -c '{"function":"verifyIntegrity","Args":["sensor_001","e3b0c44298fc1c149afb..."]}'
+```
+
+Expected output:
+```
+true
+```
+
+---
+
+### Verifying the Ledger Status
+
+To confirm both peers have committed the same blocks:
+
+```bash
+# Check Org1 peer
+peer channel getinfo -c mychannel --peerAddress localhost:7051 \
+  --tlsRootCertFiles organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+
+# Check Org2 peer
+peer channel getinfo -c mychannel --peerAddress localhost:9051 \
+  --tlsRootCertFiles organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
+```
+
+Both peers should report the same block height — confirming the ledger is in sync.
+
+---
+
+### Stopping the Network
+
+```bash
+./network.sh down
+```
+
+This stops all Docker containers and removes the channel artifacts. The ledger data is not persisted after this command unless an external volume is configured.
+
+---
+
+### How Integrity Works End-to-End
+
+```
+Arduino → FastAPI (SHA-256 computed) → PostgreSQL (hash stored)
+                                              ↓
+                                   Batch Generator reads unconfirmed hashes
+                                              ↓
+                              Hyperledger Fabric (both Org1 + Org2 endorse)
+                                              ↓
+                                   blockchain_tx field updated in PostgreSQL
+                                              ↓
+                              verifyIntegrity() → true (data untampered)
+```
+
+If any record in PostgreSQL is modified after blockchain submission, `verifyIntegrity()` will return `false` — proving tampering occurred.
