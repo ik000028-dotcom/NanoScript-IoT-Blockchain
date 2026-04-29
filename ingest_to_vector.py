@@ -1,79 +1,89 @@
 import psycopg2
 import chromadb
 from sentence_transformers import SentenceTransformer
+import time
 from datetime import datetime
 
-def run():
-    print("--- STEP 1: Initializing AI Models ---")
-    model = SentenceTransformer('all-MiniLM-L6-v2')
-    
-    print("--- STEP 2: Connecting to ChromaDB ---")
-    client = chromadb.PersistentClient(path="./chroma_db")
-    
-    # Delete old collection and recreate fresh
+CHROMA_PATH = "/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/chroma_db"
+INGEST_INTERVAL = 300  # 5 minutes
+
+def run_ingest(model, collection):
+    print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running ingestion...")
     try:
-        client.delete_collection("sensor_logs")
-        print("Old collection deleted")
-    except:
-        pass
-    collection = client.create_collection(name="sensor_logs")
-    
-    print("--- STEP 3: Connecting to PostgreSQL ---")
-    conn = psycopg2.connect(dbname="iot_data", user="ikramsmac", host="/tmp")
-    cur = conn.cursor()
-    
-    print("--- STEP 4: Fetching Paired Data ---")
-    cur.execute("""
-        SELECT 
-            t.time,
-            t.temperature,
-            h.humidity,
-            t.latitude,
-            t.longitude,
-            t.data_hash
-        FROM sensor_data t
-        JOIN sensor_data h 
-            ON ABS(EXTRACT(EPOCH FROM (t.time - h.time))) < 5
-            AND t.temperature IS NOT NULL
-            AND h.humidity IS NOT NULL
-            AND t.humidity IS NULL
-            AND h.temperature IS NULL
-        ORDER BY t.time DESC
-        LIMIT 1000
-    """)
-    rows = cur.fetchall()
-    print(f"Total paired rows found: {len(rows)}")
+        conn = psycopg2.connect(dbname="iot_data", user="ikramsmac", host="/tmp")
+        cur = conn.cursor()
 
-    documents, ids, metadatas = [], [], []
+        cur.execute("""
+            SELECT 
+                t.time, t.temperature, h.humidity,
+                t.latitude, t.longitude, t.data_hash
+            FROM sensor_data t
+            JOIN sensor_data h 
+                ON ABS(EXTRACT(EPOCH FROM (t.time - h.time))) < 5
+                AND t.temperature IS NOT NULL
+                AND h.humidity IS NOT NULL
+                AND t.humidity IS NULL
+                AND h.temperature IS NULL
+            ORDER BY t.time DESC
+            LIMIT 25000
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
 
-    print("--- STEP 5: Processing Records ---")
-    for i, (ts, temp, hum, lat, lon, dhash) in enumerate(rows):
+        print(f"Total paired rows in DB: {len(rows)}")
 
-        # Include GPS in document text if available, gracefully skip if indoors
-        gps = f", Lat: {lat}, Lon: {lon}" if lat and lon else ", GPS: indoor"
-        text = f"Time: {ts}, Temp: {temp}C, Hum: {hum}%{gps}. Hash: {dhash}"
+        # Get already indexed IDs to avoid duplicates
+        existing = set(collection.get()["ids"]) if collection.count() > 0 else set()
+        print(f"Already indexed: {len(existing)}")
 
-        documents.append(text)
-        ids.append(f"rec_{i}")
-        metadatas.append({
-            "hash": str(dhash),
-            "temp": str(temp),
-            "hum": str(hum),
-            "gps": "outdoor" if (lat and lon) else "indoor"
-        })
+        documents, ids, metadatas = [], [], []
+        added = 0
 
-        # Upload in batches of 100
-        if len(documents) >= 100:
+        for i, (ts, temp, hum, lat, lon, dhash) in enumerate(rows):
+            rec_id = f"rec_{dhash[:16]}_{i}"
+            if rec_id in existing:
+                continue
+
+            gps = f", Lat: {lat}, Lon: {lon}" if lat and lon else ", GPS: indoor"
+            text = f"Time: {ts}, Temp: {temp}C, Hum: {hum}%{gps}. Hash: {dhash}"
+
+            documents.append(text)
+            ids.append(rec_id)
+            metadatas.append({
+                "hash": str(dhash),
+                "temp": str(temp),
+                "hum": str(hum),
+                "gps": "outdoor" if (lat and lon) else "indoor"
+            })
+            added += 1
+
+            if len(documents) >= 100:
+                collection.add(documents=documents, ids=ids, metadatas=metadatas)
+                documents, ids, metadatas = [], [], []
+
+        if documents:
             collection.add(documents=documents, ids=ids, metadatas=metadatas)
-            print(f"  Uploaded batch up to record {i+1}...")
-            documents, ids, metadatas = [], [], []
 
-    # Final batch
-    if documents:
-        collection.add(documents=documents, ids=ids, metadatas=metadatas)
+        print(f"✅ Added {added} new records. Total in ChromaDB: {collection.count()}")
 
-    print(f"--- ✅ FINISHED: Indexed {collection.count()} documents ---")
-    conn.close()
+    except Exception as e:
+        print(f"Ingestion error: {e}")
+
+def main():
+    print("--- Initializing embedding model ---")
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+
+    print("--- Connecting to ChromaDB ---")
+    client = chromadb.PersistentClient(path=CHROMA_PATH)
+    collection = client.get_or_create_collection(name="sensor_logs")
+    print(f"Existing documents: {collection.count()}")
+
+    print(f"--- Auto-ingestion loop started (every {INGEST_INTERVAL}s) ---")
+    while True:
+        run_ingest(model, collection)
+        print(f"Next ingestion in {INGEST_INTERVAL} seconds...")
+        time.sleep(INGEST_INTERVAL)
 
 if __name__ == "__main__":
-    run()
+    main()
