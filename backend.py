@@ -1,89 +1,77 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import psycopg2
 import hashlib
 import json
 from datetime import datetime
+import subprocess
+import threading
 
 app = FastAPI()
 
-# 🔹 Temporary buffer to merge readings
-buffer = {
-    "temperature": None,
-    "humidity": None,
-    "gps_fix": None
-}
+# 🔹 Buffer
+buffer = {"temperature": None, "humidity": None, "gps_fix": None}
 
-# 🔹 PostgreSQL connection
-conn = psycopg2.connect(
-    dbname="iot_data",
-    user="ikramsmac",
-    password="",
-    host="localhost"
-)
-cursor = conn.cursor()
+# 🔹 Database Connection
+def get_db_conn():
+    return psycopg2.connect(
+        dbname="iot_data", user="ikramsmac", password="", host="localhost"
+    )
+
+# 🔹 Background Sync Task
+def run_sync_pipeline():
+    try:
+        print("🚀 Starting Auto-Sync...")
+        subprocess.run(["python", "batch_hash_generator.py"], check=True)
+        subprocess.run(["python", "batch_to_fabric_fixed.py"], check=True)
+        subprocess.run(["python", "ingest_to_vector.py"], check=True)
+        print("✅ Auto-Sync Complete.")
+    except Exception as e:
+        print(f"❌ Sync failed: {e}")
 
 # 🔹 Data model
 class SensorData(BaseModel):
     temperature: float | None = None
     humidity: float | None = None
-    latitude: float | None = None
-    longitude: float | None = None
     gps_fix: bool | None = None
 
-# 🔹 Insert function
-def insert_into_db(reading, data_hash):
-    cursor.execute("""
-        INSERT INTO sensor_readings
-        (temperature, humidity, latitude, longitude, gps_fix, data_hash)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (
-        reading["temperature"],
-        reading["humidity"],
-        None,  # latitude (not used now)
-        None,  # longitude (not used now)
-        reading["gps_fix"],
-        data_hash
-    ))
-    conn.commit()
-
-# 🔹 Main endpoint (MERGING LOGIC)
 @app.post("/data")
-def receive_data(data: SensorData):
+async def receive_data(data: SensorData, background_tasks: BackgroundTasks):
     global buffer
-
     data_dict = data.dict()
-
-    # ✅ Update buffer with incoming values
     for key in buffer:
         if data_dict.get(key) is not None:
             buffer[key] = data_dict[key]
 
-    # 🔍 Check if all values are collected
     if all(v is not None for v in buffer.values()):
-
-        # ✅ Create full reading object
         full_reading = {
             "temperature": buffer["temperature"],
             "humidity": buffer["humidity"],
             "gps_fix": buffer["gps_fix"],
             "timestamp": datetime.utcnow().isoformat()
         }
-
-        # ✅ Compute hash
         data_string = json.dumps(full_reading, sort_keys=True)
         data_hash = hashlib.sha256(data_string.encode()).hexdigest()
 
-        # ✅ Insert into DB
-        insert_into_db(full_reading, data_hash)
-
-        # 🔄 Reset buffer
-        buffer = {k: None for k in buffer}
-
-        print("✅ STORED FULL READING:", full_reading)
-
-        return {"status": "stored", "hash": data_hash}
-
-    print("⏳ WAITING FOR FULL DATA:", buffer)
+        try:
+            conn = get_db_conn()
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO sensor_data 
+                (temperature, humidity, gps_fix, data_hash)
+                VALUES (%s, %s, %s, %s)
+            """, (full_reading["temperature"], full_reading["humidity"], 
+                  full_reading["gps_fix"], data_hash))
+            conn.commit()
+            cur.close()
+            conn.close()
+            
+            print("✅ STORED TO POSTGRES:", full_reading)
+            background_tasks.add_task(run_sync_pipeline)
+            buffer = {k: None for k in buffer}
+            return {"status": "stored", "hash": data_hash}
+        except Exception as e:
+            print(f"❌ DB Error: {e}")
+            return {"status": "error", "detail": str(e)}
 
     return {"status": "waiting"}

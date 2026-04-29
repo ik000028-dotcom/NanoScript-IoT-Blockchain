@@ -20,7 +20,7 @@ def get_records(limit=5):
     cur = conn.cursor()
     cur.execute("""
         SELECT id, temperature, humidity, gps_fix, data_hash 
-        FROM sensor_readings 
+        FROM sensor_data 
         ORDER BY id DESC 
         LIMIT %s
     """, (limit,))
