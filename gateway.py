@@ -2,6 +2,35 @@ import serial
 import json
 import requests
 import time
+import subprocess
+import psycopg2
+
+def check_and_seal_batch():
+    """Auto-seal when 200+ unconfirmed complete records exist"""
+    try:
+        conn = psycopg2.connect(dbname="iot_data", user="ikramsmac", host="/tmp")
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT COUNT(*) FROM sensor_data 
+            WHERE blockchain_tx IS NULL 
+            AND temperature IS NOT NULL 
+            AND humidity IS NOT NULL
+        """)
+        count = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+        if count >= 200:
+            print(f"🔗 {count} unconfirmed records — auto-sealing batch...")
+            result = subprocess.run(
+                ["python3", "batch_to_fabric.py"],
+                cwd="/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/NanoScript-IoT-Blockchain",
+                capture_output=True, text=True, timeout=60
+            )
+            print(result.stdout)
+            if result.returncode != 0:
+                print("Batch error:", result.stderr[:200])
+    except Exception as e:
+        print(f"Auto-batch error: {e}")
 
 # SERIAL SETTINGS
 SERIAL_PORT = "/dev/tty.usbmodem101"  # ← this goes here, not in terminal
@@ -39,6 +68,8 @@ while True:
             try:
                 response = requests.post(API_URL, json=data)
                 print("Sent to API, status:", response.status_code)
+                if response.status_code == 200:
+                    check_and_seal_batch()
             except requests.exceptions.RequestException as e:
                 print("Failed to send to API:", e)
 
