@@ -42,7 +42,7 @@ def get_fabric_env():
 def query_ledger(batch_id):
     """Query Hyperledger ledger for a specific batch"""
     env = get_fabric_env()
-    payload = json.dumps({"function": "queryHash", "Args": [batch_id]})
+    payload = json.dumps({"function": "queryHashLatest", "Args": [batch_id]})
     cmd = [
         f"{HOME}/fabric-samples/bin/peer", "chaincode", "invoke",
         "-o", "localhost:7050",
