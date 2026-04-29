@@ -13,8 +13,8 @@ def check_and_seal_batch():
         cur.execute("""
             SELECT COUNT(*) FROM sensor_data 
             WHERE blockchain_tx IS NULL 
-            AND temperature IS NOT NULL 
-            AND humidity IS NOT NULL
+            AND data_hash IS NOT NULL
+            AND (temperature IS NOT NULL OR humidity IS NOT NULL)
         """)
         count = cur.fetchone()[0]
         cur.close()
