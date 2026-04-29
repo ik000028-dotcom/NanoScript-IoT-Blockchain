@@ -76,7 +76,8 @@ async def get_unconfirmed_batch(limit: int = 10):
         cur.execute("""
             SELECT time, temperature, humidity, latitude, longitude, data_hash 
             FROM sensor_data 
-            WHERE blockchain_tx IS NULL AND data_hash IS NOT NULL AND temperature IS NOT NULL AND humidity IS NOT NULL
+            WHERE blockchain_tx IS NULL AND data_hash IS NOT NULL
+            AND (temperature IS NOT NULL OR humidity IS NOT NULL)
             ORDER BY time ASC 
             LIMIT %s
         """, (limit,))
