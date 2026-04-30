@@ -5,13 +5,17 @@ import time
 from datetime import datetime
 
 CHROMA_PATH = "/Users/ikramsmac/Documents/PlatformIO/Projects/MKRZeroTest/chroma_db"
-INGEST_INTERVAL = 300  # 5 minutes
+INGEST_INTERVAL = 300
 
 def run_ingest(model, collection):
     print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running ingestion...")
     try:
         conn = psycopg2.connect(dbname="iot_data", user="ikramsmac", host="/tmp")
         cur = conn.cursor()
+
+        # Use count-based offset — no ID fetching needed
+        existing_count = collection.count()
+        print(f"Already indexed: {existing_count}")
 
         cur.execute("""
             SELECT 
@@ -24,8 +28,8 @@ def run_ingest(model, collection):
                 AND h.humidity IS NOT NULL
                 AND t.humidity IS NULL
                 AND h.temperature IS NULL
-            ORDER BY t.time DESC
-            LIMIT 25000
+            ORDER BY t.time ASC
+            LIMIT 100000
         """)
         rows = cur.fetchall()
         cur.close()
@@ -33,21 +37,21 @@ def run_ingest(model, collection):
 
         print(f"Total paired rows in DB: {len(rows)}")
 
-        # Get already indexed IDs to avoid duplicates
-        existing = set(collection.get()["ids"]) if collection.count() > 0 else set()
-        print(f"Already indexed: {len(existing)}")
+        # Skip already indexed rows using offset
+        new_rows = rows[existing_count:]
+        print(f"New records to add: {len(new_rows)}")
+
+        if not new_rows:
+            print("✅ ChromaDB is up to date")
+            return
 
         documents, ids, metadatas = [], [], []
         added = 0
 
-        for i, (ts, temp, hum, lat, lon, dhash) in enumerate(rows):
-            rec_id = f"rec_{dhash[:16]}_{i}"
-            if rec_id in existing:
-                continue
-
+        for i, (ts, temp, hum, lat, lon, dhash) in enumerate(new_rows):
+            rec_id = f"rec_{existing_count + i}"
             gps = f", Lat: {lat}, Lon: {lon}" if lat and lon else ", GPS: indoor"
             text = f"Time: {ts}, Temp: {temp}C, Hum: {hum}%{gps}. Hash: {dhash}"
-
             documents.append(text)
             ids.append(rec_id)
             metadatas.append({
@@ -60,6 +64,7 @@ def run_ingest(model, collection):
 
             if len(documents) >= 100:
                 collection.add(documents=documents, ids=ids, metadatas=metadatas)
+                print(f"  Uploaded {added} records...")
                 documents, ids, metadatas = [], [], []
 
         if documents:
@@ -73,12 +78,10 @@ def run_ingest(model, collection):
 def main():
     print("--- Initializing embedding model ---")
     model = SentenceTransformer('all-MiniLM-L6-v2')
-
     print("--- Connecting to ChromaDB ---")
     client = chromadb.PersistentClient(path=CHROMA_PATH)
     collection = client.get_or_create_collection(name="sensor_logs")
     print(f"Existing documents: {collection.count()}")
-
     print(f"--- Auto-ingestion loop started (every {INGEST_INTERVAL}s) ---")
     while True:
         run_ingest(model, collection)

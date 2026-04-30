@@ -74,11 +74,11 @@ def get_db_stats():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM sensor_data WHERE temperature IS NOT NULL AND humidity IS NOT NULL")
+        cur.execute("SELECT COUNT(*) FROM sensor_data WHERE (temperature IS NOT NULL OR humidity IS NOT NULL)")
         total = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM sensor_data WHERE blockchain_tx IS NOT NULL")
         sealed = cur.fetchone()[0]
-        cur.execute("SELECT time, temperature, humidity FROM sensor_data WHERE temperature IS NOT NULL ORDER BY time DESC LIMIT 1")
+        cur.execute("SELECT time, temperature, humidity FROM sensor_data WHERE temperature IS NOT NULL AND humidity IS NOT NULL ORDER BY time DESC LIMIT 1")
         latest = cur.fetchone()
         cur.close()
         conn.close()
@@ -107,7 +107,7 @@ def get_blockchain_context(prompt=""):
         cur.execute("""
             SELECT COUNT(*) FROM sensor_data 
             WHERE blockchain_tx IS NULL 
-            AND temperature IS NOT NULL AND humidity IS NOT NULL
+            AND (temperature IS NOT NULL OR humidity IS NOT NULL)
         """)
         unsealed_count = cur.fetchone()[0]
         cur.close()
@@ -169,7 +169,7 @@ def verify_records(n=20):
         cur.execute("""
             SELECT time, temperature, humidity, latitude, longitude, data_hash, blockchain_tx
             FROM sensor_data
-            WHERE temperature IS NOT NULL AND humidity IS NOT NULL AND data_hash IS NOT NULL
+            WHERE (temperature IS NOT NULL OR humidity IS NOT NULL) AND data_hash IS NOT NULL
             ORDER BY time DESC LIMIT %s
         """, (n,))
         rows = cur.fetchall()
@@ -225,25 +225,20 @@ def smart_query(prompt):
         p = prompt.lower()
         result_lines = []
 
-        cur.execute("""
-            SELECT COUNT(*), ROUND(AVG(temperature)::numeric,2),
-                   ROUND(AVG(humidity)::numeric,2),
-                   MIN(temperature), MAX(temperature),
-                   MIN(humidity), MAX(humidity),
-                   MIN(time), MAX(time)
-            FROM sensor_data WHERE temperature IS NOT NULL AND humidity IS NOT NULL
-        """)
-        stats = cur.fetchone()
-        result_lines.append(f"=== FULL DATABASE SUMMARY ({stats[0]} total records) ===")
-        result_lines.append(f"Temperature → avg: {stats[1]}°C, min: {stats[3]}°C, max: {stats[4]}°C")
-        result_lines.append(f"Humidity    → avg: {stats[2]}%, min: {stats[5]}%, max: {stats[6]}%")
-        result_lines.append(f"Time range  → {stats[7].strftime('%Y-%m-%d %H:%M')} to {stats[8].strftime('%Y-%m-%d %H:%M')}")
+        cur.execute("SELECT COUNT(*), ROUND(AVG(temperature)::numeric,2), MIN(temperature), MAX(temperature), MIN(time), MAX(time) FROM sensor_data WHERE temperature IS NOT NULL")
+        temp_stats = cur.fetchone()
+        cur.execute("SELECT COUNT(*), ROUND(AVG(humidity)::numeric,2), MIN(humidity), MAX(humidity) FROM sensor_data WHERE humidity IS NOT NULL")
+        hum_stats = cur.fetchone()
+        result_lines.append(f"=== FULL DATABASE SUMMARY ===")
+        result_lines.append(f"Temperature records: {temp_stats[0]} → avg: {temp_stats[1]}°C, min: {temp_stats[2]}°C, max: {temp_stats[3]}°C")
+        result_lines.append(f"Humidity records: {hum_stats[0]} → avg: {hum_stats[1]}%, min: {hum_stats[2]}%, max: {hum_stats[3]}%")
+        result_lines.append(f"Time range → {temp_stats[4].strftime('%Y-%m-%d %H:%M')} to {temp_stats[5].strftime('%Y-%m-%d %H:%M')}")
         result_lines.append("")
 
         if any(k in p for k in ["latest", "current", "now", "recent", "last reading", "right now", "today"]):
             cur.execute("""
                 SELECT time, temperature, humidity FROM sensor_data
-                WHERE temperature IS NOT NULL AND humidity IS NOT NULL
+                WHERE (temperature IS NOT NULL OR humidity IS NOT NULL)
                 ORDER BY time DESC LIMIT 10
             """)
             rows = cur.fetchall()
@@ -269,7 +264,7 @@ def smart_query(prompt):
             cur.execute("""
                 SELECT DATE(time), ROUND(AVG(temperature)::numeric,2),
                        ROUND(AVG(humidity)::numeric,2), COUNT(*)
-                FROM sensor_data WHERE temperature IS NOT NULL AND humidity IS NOT NULL
+                FROM sensor_data WHERE (temperature IS NOT NULL OR humidity IS NOT NULL)
                 GROUP BY DATE(time) ORDER BY DATE(time) DESC LIMIT 14
             """)
             rows = cur.fetchall()
@@ -280,7 +275,7 @@ def smart_query(prompt):
         elif any(k in p for k in ["anomal", "unusual", "spike", "strange", "weird", "outlier"]):
             cur.execute("""
                 SELECT time, temperature, humidity FROM sensor_data
-                WHERE temperature IS NOT NULL AND humidity IS NOT NULL
+                WHERE (temperature IS NOT NULL OR humidity IS NOT NULL)
                 AND (temperature > (SELECT AVG(temperature) + 2*STDDEV(temperature) FROM sensor_data WHERE temperature IS NOT NULL)
                 OR temperature < (SELECT AVG(temperature) - 2*STDDEV(temperature) FROM sensor_data WHERE temperature IS NOT NULL))
                 ORDER BY time DESC LIMIT 20
@@ -296,7 +291,7 @@ def smart_query(prompt):
                        ROUND(AVG(temperature)::numeric,2),
                        ROUND(AVG(humidity)::numeric,2), COUNT(*)
                 FROM sensor_data
-                WHERE temperature IS NOT NULL AND humidity IS NOT NULL
+                WHERE (temperature IS NOT NULL OR humidity IS NOT NULL)
                 AND time > NOW() - INTERVAL '24 hours'
                 GROUP BY DATE_TRUNC('hour', time)
                 ORDER BY DATE_TRUNC('hour', time) DESC
